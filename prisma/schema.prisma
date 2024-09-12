@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model User {
+  user_id    Int      @id @default(autoincrement())
+  username   String   @unique // Hacer username único
+  email      String   @unique
+  password   String
+  dni        Int      @unique
+  name       String
+  last_name  String
+  isActive   Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  role_id    Int
+
+  Role       Role         @relation(fields: [role_id], references: [role_id])
+  Attendance Attendance[]
+  Shift      Shift[]
+
+  @@map("User")
+}
+
+model Role {
+  role_id   Int    @id @default(autoincrement())
+  role_name String
+
+  User User[]
+
+  @@map("Role")
+}
+
+model AttendanceStatus {
+  attendanceStatus_id Int    @id @default(autoincrement())
+  status_name         String
+
+  Attendance Attendance[]
+
+  @@map("AttendanceStatus")
+}
+
+model Attendance {
+  attendance_id       Int       @id @default(autoincrement())
+  user_id             Int
+  check_in_time       DateTime
+  check_out_time      DateTime?
+  date_marked         DateTime
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+  attendanceStatus_id Int
+
+  User             User             @relation(fields: [user_id], references: [user_id])
+  AttendanceStatus AttendanceStatus @relation(fields: [attendanceStatus_id], references: [attendanceStatus_id])
+
+  @@map("Attendance")
+}
+
+model Shift {
+  shift_id    Int      @id @default(autoincrement())
+  shift_start DateTime
+  shift_end   DateTime
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+  user_id     Int
+
+  User User @relation(fields: [user_id], references: [user_id])
+
+  @@map("Shift")
+}
