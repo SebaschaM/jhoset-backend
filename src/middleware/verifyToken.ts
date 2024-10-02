@@ -13,7 +13,10 @@ export function verifyToken(req: Request, res: Response, next: NextFunction) {
   }
 
   try {
-    const secret = process.env.JWT_SECRET || "default_secret";
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      return res.status(500).json({ message: "JWT secret is not defined" });
+    }
     const decoded = jwt.verify(token, secret);
 
     (req as any).userId = (decoded as any).id;
@@ -21,11 +24,9 @@ export function verifyToken(req: Request, res: Response, next: NextFunction) {
     next(); // Continuar al siguiente middleware o controlador
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
-      return res
-        .status(401)
-        .json({
-          message: "Token expirado, por favor inicie sesión nuevamente",
-        });
+      return res.status(401).json({
+        message: "Token expirado, por favor inicie sesión nuevamente",
+      });
     } else {
       return res
         .status(401)

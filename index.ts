@@ -4,9 +4,10 @@ import cors from "cors";
 import authRoute from "./src/routes/authRoute";
 import adminRoute from "./src/routes/adminRoute";
 import employeeRoute from "./src/routes/userRoute";
+import qrRoute from "./src/routes/qrRoute";
 import { runSeed } from "./src/seed/seed";
 import { logError, logInfo, logSystem, logWarning } from "./src/utils/logger";
-import requestLogger from "./src/middleware/requestLogger";
+import requestLogger from "./src/utils/requestLogger";
 import { verifyToken } from "./src/middleware/verifyToken";
 
 dotenv.config();
@@ -31,14 +32,19 @@ async function startServer() {
     logWarning("Seed not executed because SEED is set to false.");
   }
 
+  const corsOptions = {
+    exposedHeaders: ["X-QR-Token"], // Exponer la cabecera para que el frontend pueda acceder a ella
+  };
+
   app.use(express.json());
   app.use(requestLogger);
-  app.use(cors());
+  app.use(cors(corsOptions));
   app.use("/api", authRoute);
   //app.use("/api/admin", verifyToken, adminRoute);
   app.use("/api/admin", adminRoute);
   //app.use("/api/employee", verifyToken, adminRoute);
   app.use("/api/employee", employeeRoute);
+  app.use("/api/qr", qrRoute);
 
   app.listen(PORT, () => {
     logSystem(`Server running at PORT: ${PORT}`);

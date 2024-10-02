@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { comparePassword } from "../utils/passwordUtils"; // Función para comparar contraseñas encriptadas
 import { PrismaClient } from "@prisma/client";
-import { generateToken } from "../middleware/generateToken";
+import { generateToken } from "../utils/generateToken";
 import { successResponse, errorResponse } from "../utils/responseUtils"; // Las funciones que hemos creado
 import { UserResponse } from "../interfaces/responses.interface";
 
