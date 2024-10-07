@@ -57,6 +57,7 @@ export async function runSeed() {
     const adminName = process.env.ADMIN_NAME;
     const adminLastName = process.env.ADMIN_LAST_NAME;
     const adminDni = process.env.ADMIN_DNI;
+    const adminIsActive = process.env.ADMIN_IS_ACTIVE;
 
     if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
       logWarning("Faltan variables de entorno críticas para el usuario admin.");
@@ -76,6 +77,7 @@ export async function runSeed() {
           last_name: String(adminLastName),
           role_id: Role.ADMIN,
           dni: Number(adminDni),
+          isActive: true,
         },
       });
       logInfo("Usuario admin creado con éxito.");

@@ -16,7 +16,7 @@ model User {
   dni        Int      @unique
   name       String
   last_name  String
-  isActive   Boolean  @default(true)
+  isActive   Boolean  @default(false)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   role_id    Int
@@ -49,9 +49,9 @@ model AttendanceStatus {
 model Attendance {
   attendance_id       Int       @id @default(autoincrement())
   user_id             Int
-  check_in_time       DateTime
-  check_out_time      DateTime?
-  date_marked         DateTime
+  check_in_time       String
+  check_out_time      String?
+  date_marked         String
   created_at          DateTime  @default(now())
   updated_at          DateTime  @updatedAt
   attendanceStatus_id Int

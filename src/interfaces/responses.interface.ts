@@ -22,7 +22,7 @@ export interface UserResponse {
 export interface AttendanceResponse {
   attendance_id: number;
   user_id: number;
-  check_in_time: Date;
-  date_marked: Date;
+  check_in_time: string;
+  date_marked: string;
   attendanceStatus_id: number;
 }

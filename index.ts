@@ -5,6 +5,7 @@ import authRoute from "./src/routes/authRoute";
 import adminRoute from "./src/routes/adminRoute";
 import employeeRoute from "./src/routes/userRoute";
 import qrRoute from "./src/routes/qrRoute";
+import userRoute from "./src/routes/userRoute";
 import { runSeed } from "./src/seed/seed";
 import { logError, logInfo, logSystem, logWarning } from "./src/utils/logger";
 import requestLogger from "./src/utils/requestLogger";
@@ -45,6 +46,7 @@ async function startServer() {
   //app.use("/api/employee", verifyToken, adminRoute);
   app.use("/api/employee", employeeRoute);
   app.use("/api/qr", qrRoute);
+  app.use("/api/user", userRoute);
 
   app.listen(PORT, () => {
     logSystem(`Server running at PORT: ${PORT}`);
