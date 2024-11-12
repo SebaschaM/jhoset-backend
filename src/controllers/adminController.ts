@@ -11,29 +11,33 @@ export const createUserEmployee = async (req: Request, res: Response) => {
   const { username, email, password, dni, name, last_name, role_id } = req.body;
 
   // Validar que se hayan enviado todos los datos necesarios
-  if (
-    !username ||
-    !email ||
-    !password ||
-    !dni ||
-    !name ||
-    !last_name ||
-    !role_id
-  ) {
+  if (!username || !email || !password || !dni || !name || !last_name || !role_id) {
     return errorResponse(res, 400, "Todos los campos son obligatorios");
   }
 
   try {
     // Verificar si el username ya existe
     const existingUsername = await prisma.user.findUnique({
-      where: {
-        username,
-        email,
-        dni: Number(dni),
-      },
+      where: { username },
     });
     if (existingUsername) {
-      return errorResponse(res, 400, "Usuario ya existe");
+      return errorResponse(res, 400, "El nombre de usuario ya está en uso");
+    }
+
+    // Verificar si el email ya existe (si es necesario)
+    const existingEmail = await prisma.user.findUnique({
+      where: { email },
+    });
+    if (existingEmail) {
+      return errorResponse(res, 400, "El email ya está en uso");
+    }
+
+    // Verificar si el DNI ya existe (si es necesario)
+    const existingDni = await prisma.user.findUnique({
+      where: { dni: Number(dni) },
+    });
+    if (existingDni) {
+      return errorResponse(res, 400, "El DNI ya está registrado");
     }
 
     // Encriptar la contraseña
@@ -44,7 +48,7 @@ export const createUserEmployee = async (req: Request, res: Response) => {
       data: {
         username,
         email,
-        password: String(hashedPassword),
+        password: hashedPassword,
         dni: Number(dni),
         name,
         last_name,
@@ -55,17 +59,13 @@ export const createUserEmployee = async (req: Request, res: Response) => {
     // Respuesta exitosa
     return successResponse(res, 201, "Usuario creado exitosamente", newUser);
   } catch (error) {
-    
-    return errorResponse(
-      res,
-      500,
-      "Error al crear el usuario",
-      (error as Error).message
-    );
+    console.error(error); // Usar console.error para errores
+    return errorResponse(res, 500, "Error al crear el usuario");
   }
 };
 
-export const modifyUserEmployee = async (req: Request, res: Response) => {
+
+export  const modifyUserEmployee = async (req: Request, res: Response) => {
   const { user_id, username, email, dni, name, last_name, role_id } = req.body;
 
   if (!user_id) {
