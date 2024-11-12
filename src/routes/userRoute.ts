@@ -1,24 +1,16 @@
 import express from "express";
 import {
   markAttendance,
-  createUserEmployee,
-  modifyUserEmployee,
-  deleteUserEmployee,
-  getUserEmployee,
-  getAllUsersEmployee,
-  deactivateUserEmployee,
-  activateUserEmployee,
+  getShifts,
+  asignShiftToUser,
+  getAttendaceHistoryByUser,
 } from "../controllers/userController";
 
 const router = express.Router();
 
 router.post("/mark-attendance", markAttendance);
-router.post("/create-employee", createUserEmployee);
-router.put("/modify-employee", modifyUserEmployee);
-router.delete("/delete-employee", deleteUserEmployee);
-router.get("/get-employee", getUserEmployee);
-router.get("/get-all-employee", getAllUsersEmployee);
-router.put("/deactivate-employee", deactivateUserEmployee);
-router.put("/activate-employee", activateUserEmployee);
+router.get("/shifts", getShifts);
+router.post("/assign-shift", asignShiftToUser);
+router.get("/attendance-history/:user_id", getAttendaceHistoryByUser);
 
 export default router;

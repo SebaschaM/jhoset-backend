@@ -15,7 +15,6 @@ export const generateTokenQR = async (_req: Request, res: Response) => {
     //console.log(token)
     return successResponse(res, 200, "Token QR generado correctamente", {});
   } catch (error) {
-    console.error("Error al generar el token QR:", error);
     return errorResponse(res, 500, "Error al generar el código QR");
   }
 };
@@ -68,7 +67,6 @@ export const generateQR = async (req: Request, res: Response) => {
       qrCode,
     });
   } catch (error) {
-    console.error("Error al generar el QR:", error);
     return errorResponse(res, 500, "Error al generar el código QR");
   }
 };

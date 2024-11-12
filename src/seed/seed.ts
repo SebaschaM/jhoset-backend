@@ -84,6 +84,26 @@ export async function runSeed() {
     } else {
       logInfo("El usuario admin ya existe, no se insertará un duplicado.");
     }
+
+    const shiftTypes = await prisma.shift.findMany({
+      where: {
+        shift_start: "08:00 AM",
+      },
+    });
+
+    if (shiftTypes.length === 0) {
+      await prisma.shift.createMany({
+        data: [
+          { shift_start: "08:00 AM", shift_end: "04:00 PM" },
+          { shift_start: "09:00 AM", shift_end: "05:00 PM" },
+          { shift_start: "10:00 AM", shift_end: "06:00 PM" },
+        ],
+        skipDuplicates: true,
+      });
+      logInfo("Turnos creados con éxito.");
+    } else {
+      logInfo("Los turnos ya existen, no se insertarán duplicados.");
+    }
   } catch (error) {
     if (error instanceof Error) {
       logError(error);

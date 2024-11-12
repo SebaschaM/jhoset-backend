@@ -1,24 +1,47 @@
 import { Request, Response } from "express";
+import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import { successResponse, errorResponse } from "../utils/responseUtils";
-import {
-  UserResponse,
-} from "../interfaces/responses.interface";
-import { encryptPassword } from "../utils/passwordUtils";
+import jwt from "jsonwebtoken";
 
 const prisma = new PrismaClient();
 
+dotenv.config();
+
 export const markAttendance = async (req: Request, res: Response) => {
-  const { dni, attendanceDate } = req.body;
+  const { dni, attendanceDate, attendanceHour } = req.body;
+  const authHeader = req.headers.authorization;
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret) {
+    return errorResponse(res, 500, "JWT secret no definido");
+  }
 
   if (!dni || !attendanceDate) {
     return errorResponse(res, 400, "Faltan datos para marcar la asistencia");
+  }
+
+  if (!authHeader) {
+    return errorResponse(res, 400, "Token no proporcionado en la cabecera");
+  }
+
+  const [bearer, token] = authHeader.split(" ");
+
+  if (bearer !== "Bearer" || !token) {
+    return errorResponse(res, 400, "Formato de token inválido");
+  }
+
+  try {
+    jwt.verify(token, secret);
+  } catch (error) {
+    return errorResponse(res, 401, "Token inválido o expirado");
   }
 
   try {
     const user = await prisma.user.findFirst({
       where: {
         dni: Number(dni),
+        isActive: true,
       },
     });
 
@@ -27,16 +50,56 @@ export const markAttendance = async (req: Request, res: Response) => {
     }
 
     const user_id = user.user_id;
+    const shifUser = user.shift_id;
 
-    const convertToLocaleString = (date: string) => {
-      const dateObj = new Date(date);
-      return dateObj.toLocaleString();
+    if (shifUser == null) {
+      return errorResponse(res, 404, "Usuario no tiene un turno asignado");
+    }
+
+    const existShift = await prisma.shift.findFirst({
+      where: {
+        shift_id: shifUser,
+      },
+    });
+
+    const shiftStart = existShift?.shift_start; // Ejemplo: '08:00 AM'
+    console.log("Hora registrada del turno (shiftStart):", shiftStart);
+    console.log(
+      "Hora de marcación de asistencia (attendanceHour):",
+      attendanceHour
+    ); // Ejemplo: '2:00 AM'
+
+    // Lógica para determinar si llegó temprano o tarde
+    const convertToDate = (time: string) => {
+      const [hours, minutes, period] = time
+        .match(/(\d{1,2}):(\d{2})\s?(AM|PM)/i)!
+        .slice(1);
+      let hours24 = parseInt(hours);
+      if (period.toUpperCase() === "PM" && hours24 !== 12) hours24 += 12;
+      if (period.toUpperCase() === "AM" && hours24 === 12) hours24 = 0;
+      const date = new Date();
+      date.setHours(hours24, parseInt(minutes), 0);
+      return date;
     };
 
-    const responseDate = convertToLocaleString(attendanceDate);
+    const shiftStartDate = convertToDate(shiftStart!);
+    const attendanceDateTime = convertToDate(attendanceHour);
+
+    let attendanceStatusId = 1; // Por defecto, asumimos que llegó temprano o a tiempo
+
+    if (attendanceDateTime > shiftStartDate) {
+      attendanceStatusId = 3; // Si llegó tarde, el estado es 3
+      console.log("Llegó tarde");
+
+      return;
+    }
+
+    // Continuar con el resto de la lógica para registrar la asistencia...
+    const responseDate = new Date(attendanceDate).toLocaleString();
     const time = responseDate.split(", ")[1];
     const date_marked = responseDate.split(", ")[0];
 
+    // Verificar si ya existe asistencia para el usuario en esa fecha
     const existingAttendance = await prisma.attendance.findFirst({
       where: {
         user_id: Number(user_id),
@@ -45,25 +108,38 @@ export const markAttendance = async (req: Request, res: Response) => {
     });
 
     if (existingAttendance) {
-      return errorResponse(
-        res,
-        400,
-        "Ya se ha registrado asistencia para este usuario en este día"
-      );
+      if (existingAttendance.check_out_time) {
+        return errorResponse(
+          res,
+          400,
+          "Asistencia ya registrada para el día de hoy"
+        );
+      }
+
+      await prisma.attendance.update({
+        where: {
+          attendance_id: existingAttendance.attendance_id,
+        },
+        data: {
+          check_out_time: time,
+        },
+      });
+
+      return successResponse(res, 200, "Salida registrada correctamente");
     }
 
+    // Registrar nueva asistencia
     await prisma.attendance.create({
       data: {
         user_id: Number(user_id),
         check_in_time: time,
         date_marked: date_marked,
-        attendanceStatus_id: 1,
+        attendanceStatus_id: attendanceStatusId, // Usar el status correspondiente
       },
     });
 
-    return successResponse(res, 201, "Asistencia marcada correctamente");
+    return successResponse(res, 201, "Asistencia registrada correctamente");
   } catch (error) {
-    console.error("Error al marcar asistencia:", error);
     return errorResponse(
       res,
       500,
@@ -73,191 +149,32 @@ export const markAttendance = async (req: Request, res: Response) => {
   }
 };
 
-export const createUserEmployee = async (req: Request, res: Response) => {
-  const { username, email, password, dni, name, last_name, role_id } = req.body;
-
-  // Validar que se hayan enviado todos los datos necesarios
-  if (
-    !username ||
-    !email ||
-    !password ||
-    !dni ||
-    !name ||
-    !last_name ||
-    !role_id
-  ) {
-    return errorResponse(res, 400, "Todos los campos son obligatorios");
-  }
-
+export const getShifts = async (req: Request, res: Response) => {
   try {
-    // Verificar si el username ya existe
-    const existingUsername = await prisma.user.findUnique({
-      where: { username },
-    });
-    if (existingUsername) {
-      return errorResponse(res, 400, "El nombre de usuario ya está en uso");
-    }
+    const shifts = await prisma.shift.findMany();
 
-    // Verificar si el email ya existe
-    const existingEmail = await prisma.user.findUnique({
-      where: { email },
-    });
-    if (existingEmail) {
-      return errorResponse(res, 400, "El email ya está en uso");
-    }
-
-    // Verificar si el dni ya existe
-    const existingDni = await prisma.user.findUnique({
-      where: { dni: Number(dni) },
-    });
-    if (existingDni) {
-      return errorResponse(res, 400, "El DNI ya está en uso");
-    }
-
-    // Encriptar la contraseña
-    const hashedPassword = await encryptPassword(password);
-
-    // Crear el usuario
-    const newUser = await prisma.user.create({
-      data: {
-        username,
-        email,
-        password: String(hashedPassword),
-        dni: Number(dni),
-        name,
-        last_name,
-        role_id: Number(role_id),
-      },
-    });
-
-    // Respuesta exitosa
-    return successResponse(res, 201, "Usuario creado exitosamente", newUser);
+    return successResponse(res, 200, "Turnos obtenidos correctamente", shifts);
   } catch (error) {
-    console.error("Error al crear el usuario:", error);
     return errorResponse(
       res,
       500,
-      "Error al crear el usuario",
+      "Error al obtener turnos",
       (error as Error).message
     );
   }
 };
 
-export const modifyUserEmployee = async (req: Request, res: Response) => {
-  const { user_id, username, email, dni, name, last_name, role_id } = req.body;
+export const asignShiftToUser = async (req: Request, res: Response) => {
+  const { user_id, shift_id } = req.body;
 
-  if (!user_id) {
-    return errorResponse(res, 400, "Faltan datos para modificar el usuario");
-  }
-
-  try {
-    // Validar si ya existe un usuario con el mismo username (excepto el que estamos modificando)
-    const existingUsername = await prisma.user.findFirst({
-      where: {
-        username: username,
-        user_id: {
-          not: Number(user_id), // Asegurar que no sea el mismo usuario
-        },
-      },
-    });
-    if (existingUsername) {
-      return errorResponse(
-        res,
-        400,
-        "El nombre de usuario ya está en uso por otro usuario"
-      );
-    }
-
-    // Validar si ya existe un usuario con el mismo email (excepto el que estamos modificando)
-    const existingEmail = await prisma.user.findFirst({
-      where: {
-        email: email,
-        user_id: {
-          not: Number(user_id), // Asegurar que no sea el mismo usuario
-        },
-      },
-    });
-    if (existingEmail) {
-      return errorResponse(
-        res,
-        400,
-        "El correo electrónico ya está en uso por otro usuario"
-      );
-    }
-
-    // Actualizar el usuario
-    await prisma.user.update({
-      where: {
-        user_id: Number(user_id),
-      },
-      data: {
-        username,
-        email,
-        dni: Number(dni),
-        name,
-        last_name,
-      },
-    });
-
-    return successResponse(res, 200, "Usuario modificado correctamente");
-  } catch (error) {
-    console.error("Error al modificar usuario:", error);
-    return errorResponse(
-      res,
-      500,
-      "Error al modificar usuario",
-      (error as Error).message
-    );
-  }
-};
-
-export const deleteUserEmployee = async (req: Request, res: Response) => {
-  const { user_id } = req.body;
-
-  if (!user_id) {
-    return errorResponse(res, 400, "Faltan datos para eliminar el usuario");
-  }
-
-  try {
-    await prisma.user.delete({
-      where: {
-        user_id: Number(user_id),
-      },
-    });
-
-    return successResponse(res, 200, "Usuario eliminado correctamente");
-  } catch (error) {
-    console.error("Error al eliminar usuario:", error);
-    return errorResponse(
-      res,
-      500,
-      "Error al eliminar usuario",
-      (error as Error).message
-    );
-  }
-};
-
-export const getUserEmployee = async (req: Request, res: Response) => {
-  const { user_id } = req.query;
-
-  if (!user_id) {
-    return errorResponse(res, 400, "Faltan datos para obtener el usuario");
+  if (!user_id || !shift_id) {
+    return errorResponse(res, 400, "Faltan datos para asignar el turno");
   }
 
   try {
     const user = await prisma.user.findFirst({
       where: {
         user_id: Number(user_id),
-        username: {
-          not: "admin", // Excluir usuarios con el username 'admin'
-        },
-      },
-      select: {
-        user_id: true,
-        username: true,
-        email: true,
-        name: true,
-        last_name: true,
         isActive: true,
       },
     });
@@ -266,121 +183,79 @@ export const getUserEmployee = async (req: Request, res: Response) => {
       return errorResponse(res, 404, "Usuario no encontrado");
     }
 
-    const response: UserResponse = {
-      user_id: user.user_id,
-      username: user.username,
-      email: user.email,
-      name: user.name,
-      last_name: user.last_name,
-      isActive: user.isActive,
-    };
-
-    return successResponse(res, 200, "Usuario encontrado", response);
-  } catch (error) {
-    console.error("Error al obtener usuario:", error);
-    return errorResponse(
-      res,
-      500,
-      "Error al obtener usuario",
-      (error as Error).message
-    );
-  }
-};
-
-export const getAllUsersEmployee = async (_req: Request, res: Response) => {
-  try {
-    const users = await prisma.user.findMany({
+    const shift = await prisma.shift.findFirst({
       where: {
-        username: {
-          not: "admin", // Excluir usuarios con el username 'admin'
-        },
-      },
-      select: {
-        user_id: true,
-        username: true,
-        email: true,
-        name: true,
-        last_name: true,
-        isActive: true,
+        shift_id: Number(shift_id),
       },
     });
 
-    const response: UserResponse[] = users.map((user) => {
-      return {
-        user_id: user.user_id,
-        username: user.username,
-        email: user.email,
-        name: user.name,
-        last_name: user.last_name,
-        isActive: user.isActive,
-      };
-    });
+    if (!shift) {
+      return errorResponse(res, 404, "Turno no encontrado");
+    }
 
-    return successResponse(res, 200, "Usuarios encontrados", response);
-  } catch (error) {
-    console.error("Error al obtener usuarios:", error);
-    return errorResponse(
-      res,
-      500,
-      "Error al obtener usuarios",
-      (error as Error).message
-    );
-  }
-};
-
-export const deactivateUserEmployee = async (req: Request, res: Response) => {
-  const { user_id } = req.body;
-
-  if (!user_id) {
-    return errorResponse(res, 400, "Faltan datos para desactivar el usuario");
-  }
-
-  try {
     await prisma.user.update({
       where: {
         user_id: Number(user_id),
       },
       data: {
-        isActive: false,
+        shift_id: Number(shift_id),
       },
     });
 
-    return successResponse(res, 200, "Usuario desactivado correctamente");
+    return successResponse(res, 200, "Turno asignado correctamente");
   } catch (error) {
-    console.error("Error al desactivar usuario:", error);
     return errorResponse(
       res,
       500,
-      "Error al desactivar usuario",
+      "Error al asignar turno",
       (error as Error).message
     );
   }
 };
 
-export const activateUserEmployee = async (req: Request, res: Response) => {
-  const { user_id } = req.body;
+export const getAttendaceHistoryByUser = async (
+  req: Request,
+  res: Response
+) => {
+  const { user_id } = req.params;
 
   if (!user_id) {
-    return errorResponse(res, 400, "Faltan datos para activar el usuario");
+    return errorResponse(
+      res,
+      400,
+      "Faltan datos para obtener el historial de asistencia"
+    );
   }
 
   try {
-    await prisma.user.update({
+    const user = await prisma.user.findFirst({
       where: {
         user_id: Number(user_id),
-      },
-      data: {
         isActive: true,
       },
     });
 
-    return successResponse(res, 200, "Usuario activado correctamente");
+    if (!user) {
+      return errorResponse(res, 404, "Usuario no encontrado");
+    }
+
+    const attendanceHistory = await prisma.attendance.findMany({
+      where: {
+        user_id: Number(user_id),
+      },
+    });
+
+    return successResponse(
+      res,
+      200,
+      "Historial de asistencia obtenido correctamente",
+      attendanceHistory
+    );
   } catch (error) {
-    console.error("Error al activar usuario:", error);
     return errorResponse(
       res,
       500,
-      "Error al activar usuario",
+      "Error al obtener historial de asistencia",
       (error as Error).message
     );
   }

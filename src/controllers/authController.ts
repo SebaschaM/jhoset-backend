@@ -48,7 +48,6 @@ export const loginUser = async (req: Request, res: Response) => {
       token
     );
   } catch (error) {
-    console.error(error);
     return errorResponse(
       res,
       500,

@@ -14,9 +14,11 @@ export interface UserResponse {
   user_id: number;
   username: string;
   email: string;
+  dni?: number;
   name?: string;
   last_name?: string;
   isActive?: boolean;
+  role_id?: number;
 }
 
 export interface AttendanceResponse {

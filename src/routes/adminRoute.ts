@@ -1,23 +1,26 @@
 import express from "express";
 import {
-  listUsers,
-  createUser,
-  createShift,
-  disableUser,
-  updateUser,
-  deleteUser,
-  enableUser,
+  createUserEmployee,
+  modifyUserEmployee,
+  deleteUserEmployee,
+  getAllUsersEmployee,
+  deactivateUserEmployee,
+  activateUserEmployee,
+  getUserEmployee,
+  getAllEmployeeActive
 } from "../controllers/adminController";
 
 const router = express.Router();
 
-router.get("/list-users", listUsers);
-router.post("/create-user", createUser);
-router.put("/update-user/:user_id", updateUser);
-router.delete("/delete-user", deleteUser);
-router.put("/disable-user/:user_id", disableUser);
-router.put("/enable-user/:user_id", enableUser);
+router.get("/list-users", getAllUsersEmployee);
+router.get("/list-users-active", getAllEmployeeActive);
+router.get("/get-employee/:user_id", getUserEmployee);
+router.post("/create-user", createUserEmployee);
+router.put("/update-user", modifyUserEmployee);
+router.delete("/delete-user/:user_id", deleteUserEmployee);
+router.put("/deactivate-user/", deactivateUserEmployee);
+router.put("/activate-user/", activateUserEmployee);
 
-router.post("/create-shift", createShift);
+//router.post("/create-shift", createShift);
 
 export default router;

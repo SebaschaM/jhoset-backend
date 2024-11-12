@@ -20,10 +20,11 @@ model User {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
   role_id    Int
+  shift_id   Int?
 
   Role       Role         @relation(fields: [role_id], references: [role_id])
+  Shift      Shift?        @relation(fields: [shift_id], references: [shift_id])
   Attendance Attendance[]
-  Shift      Shift[]
 
   @@map("User")
 }
@@ -47,13 +48,13 @@ model AttendanceStatus {
 }
 
 model Attendance {
-  attendance_id       Int       @id @default(autoincrement())
+  attendance_id       Int      @id @default(autoincrement())
   user_id             Int
   check_in_time       String
   check_out_time      String?
   date_marked         String
-  created_at          DateTime  @default(now())
-  updated_at          DateTime  @updatedAt
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
   attendanceStatus_id Int
 
   User             User             @relation(fields: [user_id], references: [user_id])
@@ -64,13 +65,12 @@ model Attendance {
 
 model Shift {
   shift_id    Int      @id @default(autoincrement())
-  shift_start DateTime
-  shift_end   DateTime
+  shift_start String
+  shift_end   String
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
-  user_id     Int
 
-  User User @relation(fields: [user_id], references: [user_id])
+  User User[]
 
   @@map("Shift")
 }

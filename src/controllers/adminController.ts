@@ -3,73 +3,59 @@ import { PrismaClient } from "@prisma/client";
 import { Role } from "../enum/Role.enum";
 import { encryptPassword } from "../utils/passwordUtils";
 import { errorResponse, successResponse } from "../utils/responseUtils";
+import { UserResponse } from "../interfaces/responses.interface";
 
 const prisma = new PrismaClient();
 
-//USERS
-export const listUsers = async (_req: Request, res: Response) => {
-  try {
-    const users = await prisma.user.findMany({
-      where: {
-        role_id: Role.USER,
-      },
-    });
-    return successResponse(res, 200, "Usuarios obtenidos correctamente", users);
-  } catch (error) {
-    console.error("Error al obtener los usuarios:", error);
+export const createUserEmployee = async (req: Request, res: Response) => {
+  const { username, email, password, dni, name, last_name, role_id } = req.body;
 
-    // Type Assertion: Afirmamos que el error es de tipo Error y tiene una propiedad 'message'
-    return errorResponse(
-      res,
-      500,
-      "Error al obtener los usuarios",
-      (error as Error).message
-    );
-  }
-};
-
-export const createUser = async (req: Request, res: Response) => {
-  const { username, email, password, name, last_name, dni } = req.body;
-
-  if (!username || !email || !password || !name || !last_name || !dni) {
-    return errorResponse(res, 400, "Faltan datos");
+  // Validar que se hayan enviado todos los datos necesarios
+  if (
+    !username ||
+    !email ||
+    !password ||
+    !dni ||
+    !name ||
+    !last_name ||
+    !role_id
+  ) {
+    return errorResponse(res, 400, "Todos los campos son obligatorios");
   }
 
   try {
-    const existingUser = await prisma.user.findFirst({
+    // Verificar si el username ya existe
+    const existingUsername = await prisma.user.findUnique({
       where: {
-        OR: [{ username }, { email }],
+        username,
+        email,
+        dni: Number(dni),
       },
     });
-
-    if (existingUser) {
-      return errorResponse(res, 409, "El username o email ya están en uso");
+    if (existingUsername) {
+      return errorResponse(res, 400, "Usuario ya existe");
     }
 
+    // Encriptar la contraseña
     const hashedPassword = await encryptPassword(password);
 
+    // Crear el usuario
     const newUser = await prisma.user.create({
       data: {
         username,
         email,
-        dni,
-        password: hashedPassword,
+        password: String(hashedPassword),
+        dni: Number(dni),
         name,
         last_name,
-        role_id: Role.USER,
+        role_id: Number(role_id),
       },
     });
 
-    return successResponse(res, 201, "Usuario creado exitosamente", {
-      user_id: newUser.user_id,
-      username: newUser.username,
-      email: newUser.email,
-      name: newUser.name,
-      last_name: newUser.last_name,
-      role_id: newUser.role_id,
-      isActive: newUser.isActive,
-    });
+    // Respuesta exitosa
+    return successResponse(res, 201, "Usuario creado exitosamente", newUser);
   } catch (error) {
+    
     return errorResponse(
       res,
       500,
@@ -79,101 +65,69 @@ export const createUser = async (req: Request, res: Response) => {
   }
 };
 
-export const disableUser = async (req: Request, res: Response) => {
-  const { user_id } = req.params;
+export const modifyUserEmployee = async (req: Request, res: Response) => {
+  const { user_id, username, email, dni, name, last_name, role_id } = req.body;
 
-  try {
-    const user = await prisma.user.update({
-      where: { user_id: Number(user_id) },
-      data: { isActive: false },
-    });
-
-    if (!user) {
-      return errorResponse(res, 404, "Usuario no encontrado");
-    }
-
-    return successResponse(
-      res,
-      200,
-      "Usuario deshabilitado correctamente",
-      user
-    );
-  } catch (error) {
-    return errorResponse(
-      res,
-      500,
-      "Error al deshabilitar usuario",
-      (error as Error).message
-    );
+  if (!user_id) {
+    return errorResponse(res, 400, "Faltan datos para modificar el usuario");
   }
-};
-
-export const enableUser = async (req: Request, res: Response) => {
-  const { user_id } = req.params;
 
   try {
-    const user = await prisma.user.update({
-      where: { user_id: Number(user_id) },
-      data: { isActive: true },
-    });
-
-    if (!user) {
-      return errorResponse(res, 404, "Usuario no encontrado");
-    }
-
-    return successResponse(res, 200, "Usuario habilitado correctamente", user);
-  } catch (error) {
-    return errorResponse(
-      res,
-      500,
-      "Error al habilitar usuario",
-      (error as Error).message
-    );
-  }
-};
-
-export const updateUser = async (req: Request, res: Response) => {
-  const { user_id } = req.params;
-  const { username, email, name, last_name, password } = req.body;
-
-  try {
-    const user = await prisma.user.update({
-      where: { user_id: Number(user_id) },
-      data: {
-        username,
-        email,
-        name,
-        last_name,
-        password,
+    // Validar si ya existe un usuario con el mismo username (excepto el que estamos modificando)
+    const existingUsername = await prisma.user.findFirst({
+      where: {
+        username: username,
+        email: email,
+        dni: Number(dni),
+        user_id: {
+          not: Number(user_id), // Asegurar que no sea el mismo usuario
+        },
       },
     });
 
-    if (!user) {
-      return errorResponse(res, 404, "Usuario no encontrado");
+    if (existingUsername) {
+      return errorResponse(res, 400, "Usuario existente");
     }
 
-    return successResponse(res, 200, "Usuario actualizado correctamente", user);
+    // Actualizar el usuario
+    await prisma.user.update({
+      where: {
+        user_id: Number(user_id),
+      },
+      data: {
+        username,
+        email,
+        dni: Number(dni),
+        name,
+        last_name,
+        role_id: Number(role_id),
+      },
+    });
+
+    return successResponse(res, 200, "Usuario modificado correctamente");
   } catch (error) {
     return errorResponse(
       res,
       500,
-      "Error al actualizar usuario",
+      "Error al modificar usuario",
       (error as Error).message
     );
   }
 };
 
-export const deleteUser = async (req: Request, res: Response) => {
+export const deleteUserEmployee = async (req: Request, res: Response) => {
   const { user_id } = req.params;
 
-  try {
-    const user = await prisma.user.delete({
-      where: { user_id: Number(user_id) },
-    });
+  if (!user_id) {
+    return errorResponse(res, 400, "Faltan datos para eliminar el usuario");
+  }
 
-    if (!user) {
-      return errorResponse(res, 404, "Usuario no encontrado");
-    }
+  try {
+    await prisma.user.delete({
+      where: {
+        user_id: Number(user_id),
+      },
+    });
 
     return successResponse(res, 200, "Usuario eliminado correctamente");
   } catch (error) {
@@ -186,6 +140,195 @@ export const deleteUser = async (req: Request, res: Response) => {
   }
 };
 
+export const getUserEmployee = async (req: Request, res: Response) => {
+  const { user_id } = req.params;
+
+  if (!user_id) {
+    return errorResponse(res, 400, "Faltan datos para obtener el usuario");
+  }
+
+  try {
+    const user = await prisma.user.findFirst({
+      where: {
+        user_id: Number(user_id),
+        username: {
+          not: "admin", // Excluir usuarios con el username 'admin'
+        },
+      },
+      select: {
+        user_id: true,
+        username: true,
+        dni: true,
+        email: true,
+        name: true,
+        last_name: true,
+        role_id: true,
+      },
+    });
+
+    if (!user) {
+      return errorResponse(res, 404, "Usuario no encontrado");
+    }
+
+    const response: UserResponse = {
+      user_id: user.user_id,
+      username: user.username,
+      email: user.email,
+      dni: user.dni,
+      name: user.name,
+      last_name: user.last_name,
+      role_id: user.role_id,
+    };
+
+    return successResponse(res, 200, "Usuario encontrado", response);
+  } catch (error) {
+    return errorResponse(
+      res,
+      500,
+      "Error al obtener usuario",
+      (error as Error).message
+    );
+  }
+};
+
+export const getAllUsersEmployee = async (_req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        username: {
+          not: "admin", // Excluir usuarios con el username 'admin'
+        },
+      },
+      select: {
+        user_id: true,
+        username: true,
+        email: true,
+        name: true,
+        last_name: true,
+        isActive: true,
+      },
+    });
+
+    const response: UserResponse[] = users.map((user) => {
+      return {
+        user_id: user.user_id,
+        username: user.username,
+        email: user.email,
+        name: user.name,
+        last_name: user.last_name,
+        isActive: user.isActive,
+      };
+    });
+
+    return successResponse(res, 200, "Usuarios encontrados", response);
+  } catch (error) {
+    return errorResponse(
+      res,
+      500,
+      "Error al obtener usuarios",
+      (error as Error).message
+    );
+  }
+};
+
+export const getAllEmployeeActive = async (_req: Request, res: Response) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        username: {
+          not: "admin", // Excluir usuarios con el username 'admin'
+        },
+      },
+      select: {
+        user_id: true,
+        username: true,
+        email: true,
+        name: true,
+        last_name: true,
+        shift_id: true,
+      },
+    });
+
+    const response: UserResponse[] = users.map((user) => {
+      return {
+        user_id: user.user_id,
+        username: user.username,
+        email: user.email,
+        name: user.name,
+        last_name: user.last_name,
+        shift_id: user.shift_id,
+      };
+    });
+
+    return successResponse(res, 200, "Usuarios activos encontrados", response);
+  } catch (error) {
+    return errorResponse(
+      res,
+      500,
+      "Error al obtener usuarios activos",
+      (error as Error).message
+    );
+  }
+}
+
+export const deactivateUserEmployee = async (req: Request, res: Response) => {
+  const { user_id } = req.body;
+
+  if (!user_id) {
+    return errorResponse(res, 400, "Faltan datos para desactivar el usuario");
+  }
+
+  try {
+    await prisma.user.update({
+      where: {
+        user_id: Number(user_id),
+      },
+      data: {
+        isActive: false,
+      },
+    });
+
+    return successResponse(res, 200, "Usuario desactivado correctamente");
+  } catch (error) {
+    return errorResponse(
+      res,
+      500,
+      "Error al desactivar usuario",
+      (error as Error).message
+    );
+  }
+};
+
+export const activateUserEmployee = async (req: Request, res: Response) => {
+  const { user_id } = req.body;
+
+  if (!user_id) {
+    return errorResponse(res, 400, "Faltan datos para activar el usuario");
+  }
+
+  try {
+    await prisma.user.update({
+      where: {
+        user_id: Number(user_id),
+      },
+      data: {
+        isActive: true,
+      },
+    });
+
+    return successResponse(res, 200, "Usuario activado correctamente");
+  } catch (error) {
+    return errorResponse(
+      res,
+      500,
+      "Error al activar usuario",
+      (error as Error).message
+    );
+  }
+};
+
+/*
 //SHIFTS
 export const createShift = async (req: Request, res: Response) => {
   const { shift_start, shift_end, user_id } = req.body;
@@ -221,3 +364,4 @@ export const createShift = async (req: Request, res: Response) => {
     );
   }
 };
+*/
