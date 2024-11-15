@@ -10,6 +10,7 @@ dotenv.config();
 
 export const markAttendance = async (req: Request, res: Response) => {
   const { dni, attendanceDate, attendanceHour } = req.body;
+
   const authHeader = req.headers.authorization;
   const secret = process.env.JWT_SECRET;
 
@@ -87,17 +88,24 @@ export const markAttendance = async (req: Request, res: Response) => {
 
     let attendanceStatusId = 1; // Por defecto, asumimos que llegó temprano o a tiempo
 
+    console.log(attendanceDateTime);
+
     if (attendanceDateTime > shiftStartDate) {
       attendanceStatusId = 3; // Si llegó tarde, el estado es 3
       console.log("Llegó tarde");
-
-      return;
     }
 
     // Continuar con el resto de la lógica para registrar la asistencia...
     const responseDate = new Date(attendanceDate).toLocaleString();
+    console.log(
+      "Fecha de marcación de asistencia (responseDate):",
+      responseDate
+    );
     const time = responseDate.split(", ")[1];
     const date_marked = responseDate.split(", ")[0];
+
+    console.log(time);
+    console.log(date_marked);
 
     // Verificar si ya existe asistencia para el usuario en esa fecha
     const existingAttendance = await prisma.attendance.findFirst({
