@@ -102,7 +102,6 @@ export const markAttendance = async (req: Request, res: Response) => {
     const time = responseDate.split(", ")[1];
     const date_marked = responseDate.split(", ")[0];
 
-
     // Verificar si ya existe asistencia para el usuario en esa fecha
     const existingAttendance = await prisma.attendance.findFirst({
       where: {
