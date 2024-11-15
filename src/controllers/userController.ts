@@ -88,8 +88,6 @@ export const markAttendance = async (req: Request, res: Response) => {
 
     let attendanceStatusId = 1; // Por defecto, asumimos que llegó temprano o a tiempo
 
-    console.log(attendanceDateTime);
-
     if (attendanceDateTime > shiftStartDate) {
       attendanceStatusId = 3; // Si llegó tarde, el estado es 3
       console.log("Llegó tarde");
@@ -104,8 +102,6 @@ export const markAttendance = async (req: Request, res: Response) => {
     const time = responseDate.split(", ")[1];
     const date_marked = responseDate.split(", ")[0];
 
-    console.log(time);
-    console.log(date_marked);
 
     // Verificar si ya existe asistencia para el usuario en esa fecha
     const existingAttendance = await prisma.attendance.findFirst({
